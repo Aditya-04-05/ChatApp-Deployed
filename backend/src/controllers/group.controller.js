@@ -41,9 +41,8 @@ export const addMembers = async (req, res) => {
   try {
     const { newMembers } = req.body;
     const { groupId } = req.params;
-    // const grpId = req.group._id;
 
-    if (!Array.isArray(newMembers) || newMembers.length == 0) {
+    if (!Array.isArray(newMembers) || newMembers.length === 0) {
       return res.status(400).json({ messsage: "Members cann't be empty" });
     }
 
@@ -64,6 +63,72 @@ export const addMembers = async (req, res) => {
   }
 };
 
-export const removeMembers = async (req, res) => {};
+export const removeMembers = async (req, res) => {
+  try {
+    const { removedMembers } = req.body;
+    const { groupId } = req.params;
 
-export const updateGroup = async (req, res) => {};
+    if (!Array.isArray(removedMembers) || removedMembers.length === 0) {
+      return res.status(400).json({ messsage: "Members cann't be empty" });
+    }
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    if (removedMembers.includes(group.groupAdmin.toString())) {
+      return res
+        .status(400)
+        .json({ message: "Admin cannot be removed from the group" });
+    }
+    const updatedGroup = await Group.findByIdAndUpdate(
+      groupId,
+      { $pull: { groupMembers: { $in: removedMembers } } },
+      { new: true }
+    );
+
+    if (!updatedGroup) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    res.status(200).json(updatedGroup);
+  } catch (error) {
+    console.log("Error in Remove Members controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const updateGroup = async (req, res) => {
+  try {
+    const { groupDescription, groupProfilePic } = req.body;
+    const { groupId } = req.params;
+
+    if (!groupProfilePic && !groupDescription) {
+      return res
+        .status(400)
+        .json({ message: "At least one Field is required" });
+    }
+
+    let group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+    let updatedFields = {};
+    if (groupProfilePic) {
+      const uploadResponse = await cloudinary.uploader.upload(groupProfilePic);
+      updatedFields.groupProfilePic = uploadResponse.secure_url;
+    }
+    if (groupDescription) {
+      updatedFields.groupDescription = groupDescription;
+    }
+    const updatedGroup = await Group.findByIdAndUpdate(groupId, updatedFields, {
+      new: true,
+    });
+
+    res.status(200).json(updatedGroup);
+  } catch (error) {
+    console.log("Error in Update Group controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
